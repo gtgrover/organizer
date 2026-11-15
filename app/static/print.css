@@ -1,6 +1,8 @@
 /* GENERATED from shared/print.css by tools/sync.py. Edit that file, not this one. */
-/* Printable month calendar. Same layout as the original pop-up print window:
-   US Letter landscape, 0.25in margins, 7x6 grid, Arial, black on white.
+/* Printable month calendar: 7x6 grid, Arial, black on white.
+   It asks for US Letter landscape with 0.25in margins (Chrome and Edge honour that),
+   but it stretches to fill whatever page area it actually gets, so it also prints at
+   100% when the browser picks the orientation or margins itself (Safari ignores @page).
    Printing switches to the calendar whenever #print-calendar has content (it is
    filled by "Print selected month"). This deliberately doesn't depend on any
    before/after-print event, because Safari fires those at the wrong moment. */
@@ -8,15 +10,16 @@
 @page{size:letter landscape;margin:.25in}
 @media print{
 	body:has(#print-calendar:not(:empty))>*:not(#print-calendar){display:none!important}
-	html:has(#print-calendar:not(:empty)){background:#fff;color-scheme:light}
-	body:has(#print-calendar:not(:empty)){margin:0!important;padding:0!important;max-width:none!important;background:#fff;color:#111}
-	#print-calendar:not(:empty){display:block}
+	html:has(#print-calendar:not(:empty)){height:100%;background:#fff;color-scheme:light}
+	body:has(#print-calendar:not(:empty)){height:100%;margin:0!important;padding:0!important;max-width:none!important;background:#fff;color:#111}
+	#print-calendar:not(:empty){display:flex}
 	#print-calendar,#print-calendar *{box-sizing:border-box}
-	#print-calendar{width:10.5in;height:8in;margin:0;font-family:Arial,sans-serif;color:#111;background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}
-	#print-calendar h1{height:.4in;margin:0;font-size:20pt;line-height:.4in}
+	/* fill the printable area of one page (a hair under 100% so rounding never spills onto a 2nd page) */
+	#print-calendar{flex-direction:column;width:100%;height:calc(100% - 2px);margin:0;overflow:hidden;break-inside:avoid;font-family:Arial,sans-serif;color:#111;background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+	#print-calendar h1{flex:none;height:.4in;margin:0;font-size:20pt;line-height:.4in}
 	#print-calendar .pc-weekdays,#print-calendar .pc-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
-	#print-calendar .pc-weekdays{height:.3in;align-items:center;text-align:center;font-size:9pt;font-weight:700}
-	#print-calendar .pc-month-grid{height:7.3in;grid-template-rows:repeat(6,minmax(0,1fr));border-top:1px solid #333;border-left:1px solid #333}
+	#print-calendar .pc-weekdays{flex:none;height:.3in;align-items:center;text-align:center;font-size:9pt;font-weight:700}
+	#print-calendar .pc-month-grid{flex:1 1 auto;min-height:0;grid-template-rows:repeat(6,minmax(0,1fr));border-top:1px solid #333;border-left:1px solid #333}
 	#print-calendar .pc-day{min-width:0;min-height:0;overflow:hidden;padding:.045in;border-right:1px solid #333;border-bottom:1px solid #333}
 	#print-calendar .pc-day-number{margin-bottom:.025in;font-size:9pt;font-weight:700}
 	#print-calendar .pc-event{margin:.02in 0;font-size:7.5pt;line-height:1.15;overflow-wrap:anywhere}

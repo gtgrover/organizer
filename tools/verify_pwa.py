@@ -253,6 +253,11 @@ try:
         page.set_viewport_size({'width': 1008, 'height': 768})
         page.screenshot(path=str(SHOTS / 'pwa-print.png'))
         page.pdf(path=str(SHOTS / 'pwa-print.pdf'), prefer_css_page_size=True)
+        # must fit ONE page whatever paper/orientation/margins the browser uses (Safari ignores @page)
+        for fmt, land, margin in [('Letter', False, '0.5in'), ('Letter', True, '0.75in'), ('A4', False, '0.4in'), ('A4', True, '0.6in')]:
+            pdf = page.pdf(format=fmt, landscape=land, prefer_css_page_size=False, margin={k: margin for k in ('top', 'bottom', 'left', 'right')})
+            pages = len(re.findall(rb'/Type\s*/Page[^s]', pdf))
+            check(f'print fits one page: {fmt} {"landscape" if land else "portrait"}, {margin} margins', pages == 1, f'{pages} pages')
         month_label = page.evaluate("new Date(localDay()+'T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})")
         check('print layout shows month + events', page.inner_text('#print-calendar h1') == month_label and 'Dentist (moved)' in page.inner_text('#print-calendar'))
         page.emulate_media(media='screen')
