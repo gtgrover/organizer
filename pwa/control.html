@@ -99,11 +99,20 @@
 		$('#day').value = localDay();
 		$('#print-month').value = localDay().slice(0, 7);
 		$('#event-day').value = localDay();
+		// The new-event date follows the day selected on the display (the "Selected date"
+		// field), until someone picks a date in the event form themselves.
+		let eventDayChosen = false;
+		['input', 'change'].forEach(type => $('#event-day').addEventListener(type, () => { eventDayChosen = true; }));
+		function followSelectedDay() {
+			if (editingEventId !== null || eventDayChosen || document.activeElement === $('#event-day')) return;
+			$('#event-day').value = $('#day').value || localDay();
+		}
 
 		function resetEventForm() {
 			editingEventId = null;
 			$('#event-form').reset();
-			$('#event-day').value = localDay();
+			eventDayChosen = false;
+			$('#event-day').value = $('#day').value || localDay();
 			$('#event-form-heading').textContent = 'New calendar event';
 			$('#event-submit').textContent = 'Add event';
 			$('#cancel-event-edit').hidden = true;
@@ -161,6 +170,7 @@
 		function render() {
 			const selected = state.selected_day || localDay();
 			if (document.activeElement !== $('#day')) $('#day').value = selected;
+			followSelectedDay();
 			$('#tasks').innerHTML = state.tasks.map(task => `<div class="task"><label><input data-task="${esc(task.id)}" type="checkbox" ${task.done ? 'checked' : ''}>${esc(task.title)}</label><button data-del-task="${esc(task.id)}">Delete</button></div>`).join('') || '<p class="muted">No tasks yet.</p>';
 			bindTasks($('#tasks'));
 			document.querySelectorAll('[data-del-task]').forEach(button => {

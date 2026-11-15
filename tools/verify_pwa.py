@@ -139,6 +139,19 @@ try:
         disp.wait_for_function("!document.querySelector('#calendar-panel').classList.contains('hidden')")
         dots = disp.eval_on_selector_all('#agenda .event-dot', 'els=>els.map(e=>e.className)')
         check('agenda dot colors shown', any('dot-red' in d for d in dots), str(dots))
+
+        # ---- new-event date follows the day selected on the display ----
+        page.reload(); page.wait_for_function('state.tasks.length>0')
+        other = today[:8] + ('02' if today[8:] == '01' else '01')
+        disp.click(f'[data-day="{other}"]')
+        page.wait_for_function(f"document.querySelector('#event-day').value==='{other}'", timeout=5000)
+        check('new-event date = day selected on display', True)
+        page.fill('#event-day', today)  # a date picked by hand in the form...
+        disp.click(f'[data-day="{today[:8]}03"]' if today[8:] != '03' else f'[data-day="{today[:8]}04"]')
+        page.wait_for_timeout(800)
+        check('...is not overwritten by later display selections', page.input_value('#event-day') == today)
+        disp.click(f'[data-day="{today}"]'); page.wait_for_function(f"document.querySelector('#day').value==='{today}'")
+        page.reload(); page.wait_for_function('state.tasks.length>0')
         disp.close()
 
         # ---- reload persists ----
