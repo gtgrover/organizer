@@ -77,7 +77,8 @@
 	<section class="panel" style="margin-top:14px">
 		<h2>Backup</h2>
 		<p class="muted" style="margin-top:0">Your data is stored only on this device. Export a backup now and then, or to share your calendar with someone else.</p>
-		<button id="export-data" type="button" style="width:100%">Export backup file</button>
+		<button id="export-data" class="backup-button" type="button">Backup</button>
+		<p id="backup-session" class="backup-state" role="status"></p>
 		<label for="import-file">Import a backup file</label>
 		<input id="import-file" type="file" accept=".json,application/json">
 		<label for="import-mode">When importing</label>
@@ -182,6 +183,39 @@
 					}
 				};
 			});
+			showBackupState();
+		}
+
+		// "Backed up this session?" Works on every device: we remember when Backup was last
+		// used in this browser session, plus a fingerprint of the data at that moment, and
+		// compare it with the data now. (Resets when the app or tab is closed.)
+		const backupKey = (document.documentElement.dataset.app || 'organizer') + '-backup-session';
+		function dataFingerprint() {
+			const text = JSON.stringify([state.events, state.tasks, state.notes]);
+			let h = 2166136261; // FNV-1a hash: a short string is enough to spot any change
+			for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+			return (h >>> 0).toString(36) + ':' + text.length;
+		}
+		let backupInMemory = null; // fallback if the browser blocks sessionStorage
+		function readBackupSession() {
+			try { return JSON.parse(sessionStorage.getItem(backupKey)) || backupInMemory; } catch (_) { return backupInMemory; }
+		}
+		function showBackupState() {
+			const done = readBackupSession();
+			const el = $('#backup-session');
+			if (!done) {
+				el.className = 'backup-state warn';
+				el.textContent = '⚠ Not backed up yet this session';
+				return;
+			}
+			const at = new Date(done.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+			if (done.fingerprint === dataFingerprint()) {
+				el.className = 'backup-state ok';
+				el.textContent = `✓ Backed up at ${at}`;
+			} else {
+				el.className = 'backup-state warn';
+				el.textContent = `⚠ Changes since your backup at ${at}. Tap Backup again.`;
+			}
 		}
 
 		// Used by pwa.js: don't auto-reload for an app update while something is being typed.
@@ -234,9 +268,14 @@
 
 		$('#export-data').onclick = async () => {
 			try {
+				const fingerprint = dataFingerprint(); // the data being saved
 				const name = await Backup.exportAs('json');
-				$('#backup-status').textContent = `Exported ${name}.`;
+				backupInMemory = { at: new Date().toISOString(), fingerprint };
+				try { sessionStorage.setItem(backupKey, JSON.stringify(backupInMemory)); } catch (_) { /* storage blocked: memory copy still works */ }
+				$('#backup-status').textContent = `Saved ${name}.`;
+				showBackupState();
 			} catch (error) {
+				// AbortError = the share sheet was closed without saving: not counted as a backup
 				if (error.name !== 'AbortError') alert(error.message);
 			}
 		};

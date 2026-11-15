@@ -159,9 +159,21 @@ try:
 
         # ---- export ----
         page.goto(BASE + 'control.html'); page.wait_for_function('state.events.length>0')
+        check('backup button says Backup', page.inner_text('#export-data') == 'Backup')
+        check('status before backup: not backed up', 'Not backed up' in page.inner_text('#backup-session'), page.inner_text('#backup-session'))
         with page.expect_download() as dl:
             page.click('#export-data')
         path = S / 'export1.json'; dl.value.save_as(path)
+        page.wait_for_function("document.querySelector('#backup-session').textContent.includes('Backed up at')")
+        check('status after backup: backed up', 'backup-state ok' in page.get_attribute('#backup-session', 'class'))
+        page.reload(); page.wait_for_function('state.events.length>0')
+        check('status survives reload in same session', 'Backed up at' in page.inner_text('#backup-session'))
+        page.fill('#task-title', 'After backup'); page.click('#task-form button[type=submit]')
+        page.wait_for_function("document.querySelector('#backup-session').textContent.includes('Changes since')")
+        check('status after a change: changes since backup', True)
+        page.click(f'[data-del-task="{page.evaluate("state.tasks.find(t=>t.title===\'After backup\').id")}"]')
+        page.wait_for_function("document.querySelector('#backup-session').textContent.includes('Backed up at')")
+        check('undoing the change: backed up again', True)
         exported = json.loads(path.read_text())
         check('export file format', exported['app'] == 'personal-organizer' and exported['schemaVersion'] == 1 and 'exportedAt' in exported
               and len(exported['data']['events']) == len(snapshot(page)['events']), dl.value.suggested_filename)
@@ -292,10 +304,14 @@ try:
             pg.screenshot(path=str(SHOTS / 'old-display.png'))
             pg.goto(OLD_APP + '/control'); pg.wait_for_timeout(1000)
             pg.fill('#print-month', today[:7])
-            with c.expect_page() as pop:
-                pg.click('#print-month-calendar')
-            w = pop.value; w.wait_for_load_state(); w.set_viewport_size(size); w.emulate_media(media='print')
-            w.screenshot(path=str(SHOTS / 'old-print.png'))
+            if pg.evaluate("!!document.querySelector('#print-calendar')"):  # current Docker app: in-page print
+                pg.set_viewport_size(size); pg.evaluate('window.print=()=>{}'); pg.click('#print-month-calendar')
+                pg.emulate_media(media='print'); pg.screenshot(path=str(SHOTS / 'old-print.png'))
+            else:  # older Docker app: pop-up print window
+                with c.expect_page() as pop:
+                    pg.click('#print-month-calendar')
+                w = pop.value; w.wait_for_load_state(); w.set_viewport_size(size); w.emulate_media(media='print')
+                w.screenshot(path=str(SHOTS / 'old-print.png'))
             c.close()
             # new app: same data via the migration file
             c = browser.new_context(viewport={'width': 1280, 'height': 900}, timezone_id='America/Chicago'); pg = c.new_page()
