@@ -140,15 +140,16 @@
 			const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 				.map(day => `<div class="pc-weekday">${day}</div>`).join('');
 			$('#print-calendar').innerHTML = `<h1>${esc(monthLabel)}</h1><div class="pc-weekdays">${weekdays}</div><div class="pc-month-grid">${dayCells}</div>`;
-			const pageTitle = document.title;
+			// Once #print-calendar has content, print.css prints only the calendar. Nothing is
+			// switched back after printing: Safari (iPhone and Mac) reports "printing finished"
+			// before it has actually printed, which used to put the normal screen on paper.
 			document.title = `${monthLabel} Calendar`; // used as the PDF name / print header
-			document.body.classList.add('printing-calendar');
-			window.addEventListener('afterprint', () => {
-				document.body.classList.remove('printing-calendar');
-				document.title = pageTitle;
-			}, { once: true });
-			window.print();
+			const restoreTitle = () => { document.title = pageTitle; };
+			setTimeout(() => window.addEventListener('pointerdown', restoreTitle, { once: true }), 1000);
+			// let the browser lay out the calendar before the print dialog takes its snapshot
+			requestAnimationFrame(() => setTimeout(() => window.print(), 50));
 		}
+		const pageTitle = document.title;
 
 		function render() {
 			const selected = state.selected_day || localDay();

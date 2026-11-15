@@ -1,12 +1,15 @@
 /* Printable month calendar. Same layout as the original pop-up print window:
-   US Letter landscape, 0.25in margins, 7x6 grid, Arial, black on white. */
+   US Letter landscape, 0.25in margins, 7x6 grid, Arial, black on white.
+   Printing switches to the calendar whenever #print-calendar has content (it is
+   filled by "Print selected month"). This deliberately doesn't depend on any
+   before/after-print event, because Safari fires those at the wrong moment. */
 #print-calendar{display:none}
 @page{size:letter landscape;margin:.25in}
 @media print{
-	body.printing-calendar>*:not(#print-calendar){display:none!important}
-	html:has(body.printing-calendar){background:#fff;color-scheme:light}
-	body.printing-calendar{margin:0!important;padding:0!important;max-width:none!important;background:#fff;color:#111}
-	body.printing-calendar #print-calendar{display:block}
+	body:has(#print-calendar:not(:empty))>*:not(#print-calendar){display:none!important}
+	html:has(#print-calendar:not(:empty)){background:#fff;color-scheme:light}
+	body:has(#print-calendar:not(:empty)){margin:0!important;padding:0!important;max-width:none!important;background:#fff;color:#111}
+	#print-calendar:not(:empty){display:block}
 	#print-calendar,#print-calendar *{box-sizing:border-box}
 	#print-calendar{width:10.5in;height:8in;margin:0;font-family:Arial,sans-serif;color:#111;background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}
 	#print-calendar h1{height:.4in;margin:0;font-size:20pt;line-height:.4in}

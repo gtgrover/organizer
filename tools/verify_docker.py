@@ -30,6 +30,8 @@ PWA = f'http://localhost:{PWA_PORT}/'
 OLD = os.environ.get('OLD_APP_URL', 'http://localhost:8280')
 IMAGE, NAME = 'home-organizer-test', 'home-organizer-test'
 results = []
+# Print the way Safari behaves: print() returns at once and 'afterprint' fires immediately.
+SAFARI_PRINT = "window.print=()=>{window.dispatchEvent(new Event('beforeprint'));window.dispatchEvent(new Event('afterprint'))}"
 
 def check(name, cond, detail=''):
     results.append((name, bool(cond)))
@@ -199,7 +201,10 @@ try:
         pg.close()
 
         # ---- print (now in-page, same as offline app) ----
-        ctl.fill('#print-month', today[:7]); ctl.evaluate('window.print=()=>{}'); ctl.click('#print-month-calendar')
+        ctl.fill('#print-month', today[:7]); ctl.evaluate(SAFARI_PRINT); ctl.click('#print-month-calendar'); ctl.wait_for_timeout(300)
+        ctl.emulate_media(media='print')
+        check('print shows calendar, not the screen (Safari timing)', ctl.is_visible('#print-calendar') and not ctl.is_visible('header'))
+        ctl.emulate_media(media='screen')
         check('print layout built', 'Docker test edited' in ctl.inner_text('#print-calendar'))
         ctx.close()
 
@@ -221,7 +226,7 @@ try:
                     pg.screenshot(path=str(OUT / f'{label}-display.png'))
                     pg.goto(base + ctl_path); pg.wait_for_timeout(1000); pg.fill('#print-month', today[:7])
                     if pg.evaluate("!!document.querySelector('#print-calendar')"):  # in-page print
-                        pg.set_viewport_size(size); pg.evaluate('window.print=()=>{}'); pg.click('#print-month-calendar')
+                        pg.set_viewport_size(size); pg.evaluate(SAFARI_PRINT); pg.click('#print-month-calendar')
                         pg.emulate_media(media='print'); pg.screenshot(path=str(OUT / f'{label}-print.png'))
                     else:  # older pop-up print
                         with c.expect_page() as pop:

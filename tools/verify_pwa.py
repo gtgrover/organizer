@@ -35,6 +35,8 @@ PORT = 8765
 BASE = f'http://localhost:{PORT}/'
 SHOTS = S / 'shots'; SHOTS.mkdir(exist_ok=True)
 results = []
+# Print the way Safari behaves: print() returns at once and 'afterprint' fires immediately.
+SAFARI_PRINT = "window.print=()=>{window.dispatchEvent(new Event('beforeprint'));window.dispatchEvent(new Event('afterprint'))}"
 
 def check(name, cond, detail=''):
     results.append((name, bool(cond), detail))
@@ -231,9 +233,10 @@ try:
         # ---- print output ----
         page.goto(BASE + 'control.html'); page.wait_for_function('state.events.length>0')
         page.fill('#print-month', today[:7])  # month containing the test's own events
-        page.evaluate('window.print=()=>{}')  # we just render the print layout
-        page.click('#print-month-calendar')
+        page.evaluate(SAFARI_PRINT)  # we just render the print layout
+        page.click('#print-month-calendar'); page.wait_for_timeout(300)
         page.emulate_media(media='print')
+        check('print shows calendar, not the screen (Safari timing)', page.is_visible('#print-calendar') and not page.is_visible('header'))
         page.set_viewport_size({'width': 1008, 'height': 768})
         page.screenshot(path=str(SHOTS / 'pwa-print.png'))
         page.pdf(path=str(SHOTS / 'pwa-print.pdf'), prefer_css_page_size=True)
@@ -305,7 +308,7 @@ try:
             pg.goto(OLD_APP + '/control'); pg.wait_for_timeout(1000)
             pg.fill('#print-month', today[:7])
             if pg.evaluate("!!document.querySelector('#print-calendar')"):  # current Docker app: in-page print
-                pg.set_viewport_size(size); pg.evaluate('window.print=()=>{}'); pg.click('#print-month-calendar')
+                pg.set_viewport_size(size); pg.evaluate(SAFARI_PRINT); pg.click('#print-month-calendar')
                 pg.emulate_media(media='print'); pg.screenshot(path=str(SHOTS / 'old-print.png'))
             else:  # older Docker app: pop-up print window
                 with c.expect_page() as pop:
@@ -324,7 +327,7 @@ try:
             pg.screenshot(path=str(SHOTS / 'new-display.png'))
             pg.goto(BASE + 'control.html'); pg.wait_for_timeout(500)
             pg.set_viewport_size(size)
-            pg.fill('#print-month', today[:7]); pg.evaluate('window.print=()=>{}'); pg.click('#print-month-calendar')
+            pg.fill('#print-month', today[:7]); pg.evaluate(SAFARI_PRINT); pg.click('#print-month-calendar')
             pg.emulate_media(media='print'); pg.screenshot(path=str(SHOTS / 'new-print.png'))
             c.close()
             for name in ['display', 'print']:
