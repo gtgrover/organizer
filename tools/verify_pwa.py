@@ -19,7 +19,7 @@ also screenshots the old and new display and printed month with the same data an
 checks they are pixel-identical (the app name in the header is ignored). Otherwise that part is skipped.
 
 Uses only throwaway browser profiles: your own browser data is never touched.
-Output (screenshots, exported files) goes to tools/test-output/, replaced each run.
+Output (screenshots, exported files) goes to tools/test-output/pwa/, replaced each run.
 Exit code 0 = all checks passed.
 """
 import json, os, shutil, subprocess, sys, time, re, urllib.request
@@ -29,7 +29,7 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parent.parent
 PWA = ROOT / 'pwa'
 OLD_APP = os.environ.get('OLD_APP_URL', 'http://localhost:8280')
-S = ROOT / 'tools' / 'test-output'
+S = ROOT / 'tools' / 'test-output' / 'pwa'
 shutil.rmtree(S, ignore_errors=True); S.mkdir(parents=True)
 PORT = 8765
 BASE = f'http://localhost:{PORT}/'

@@ -1,3 +1,4 @@
+/* GENERATED from shared/backup.js by tools/sync.py. Edit that file, not this one. */
 // Backup files: export this device's data to a file, and import one back in.
 (function () {
 	'use strict';
@@ -16,9 +17,10 @@
 	// DTSTART;VALUE=DATE:YYYYMMDD straight from `day`; timed events use a floating
 	// local DTSTART:YYYYMMDDTHHMM00 so they stay in the user's timezone), then add a
 	// button that calls Backup.exportAs('ics').
+	const slug = document.documentElement.dataset.app || 'organizer'; // set per app by tools/sync.py
 	const EXPORTERS = {
 		json: snapshot => ({
-			filename: `personal-organizer-backup-${stamp()}.json`,
+			filename: `${slug}-backup-${stamp()}.json`,
 			mime: 'application/json',
 			text: JSON.stringify(snapshot, null, 2)
 		})

@@ -10,7 +10,9 @@ Then in the PWA: Control -> Backup -> choose the file -> Import (Replace or Merg
 Only reads the database (opened read-only), so it is safe to run while the
 container is up. Standard library only.
 
-IDs: each old integer id becomes a fixed UUID (uuid5 of "event:<id>" / "task:<id>"),
+Newer Docker databases already store each record's UUID and timestamps; those are
+copied as-is. (The Docker app can also export directly: Control -> Backup.)
+For older databases, each integer id becomes a fixed UUID (uuid5 of "event:<id>" / "task:<id>"),
 so running this twice and importing both files with Merge does not create duplicates.
 """
 import json
@@ -49,6 +51,7 @@ def main():
     db = sqlite3.connect(f'file:{src}?mode=ro', uri=True)
     db.row_factory = sqlite3.Row
     columns = {r['name'] for r in db.execute('PRAGMA table_info(events)')}
+    task_columns = {r['name'] for r in db.execute('PRAGMA table_info(tasks)')}
 
     stamp = iso(datetime.now(timezone.utc))
     # The old database has no timestamps. Use a fixed, old placeholder spread by id:
@@ -64,15 +67,15 @@ def main():
             day = r['day']
             datetime.strptime(day, '%Y-%m-%d')  # must be a real date; kept as the same text
             event = {
-                'id': str(uuid.uuid5(NAMESPACE, f"event:{r['id']}")),
+                'id': r['uid'] if 'uid' in columns and r['uid'] else str(uuid.uuid5(NAMESPACE, f"event:{r['id']}")),
                 'day': day,
                 'time': normalize_time(r['time']),
                 'title': (r['title'] or '').strip()[:160],
                 'category': r['category'] if r['category'] in CATEGORIES else 'Other',
                 'description': ((r['description'] if 'description' in columns else '') or '').strip()[:1000],
                 'color': r['color'] if 'color' in columns and r['color'] in COLORS else 'blue',
-                'created': created(r['id']),
-                'updated': created(r['id']),
+                'created': r['created'] if 'created' in columns and r['created'] else created(r['id']),
+                'updated': r['updated'] if 'updated' in columns and r['updated'] else created(r['id']),
             }
             if not event['title']:
                 raise ValueError('empty title')
@@ -81,11 +84,11 @@ def main():
             problems.append(f"event id {r['id']}: {exc}")
 
     tasks = [{
-        'id': str(uuid.uuid5(NAMESPACE, f"task:{r['id']}")),
+        'id': r['uid'] if 'uid' in task_columns and r['uid'] else str(uuid.uuid5(NAMESPACE, f"task:{r['id']}")),
         'title': r['title'].strip()[:160],
         'done': bool(r['done']),
-        'created': created(r['id']),
-        'updated': created(r['id']),
+        'created': r['created'] if 'created' in task_columns and r['created'] else created(r['id']),
+        'updated': r['updated'] if 'updated' in task_columns and r['updated'] else created(r['id']),
     } for r in db.execute('SELECT * FROM tasks ORDER BY id') if (r['title'] or '').strip()]
 
     note = db.execute('SELECT content FROM notes WHERE id=1').fetchone()

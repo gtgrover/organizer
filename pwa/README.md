@@ -8,6 +8,11 @@ data stays only on their own device.** To move or share data, use
 This folder is the whole app: plain HTML, CSS and JavaScript with no libraries,
 no build step and nothing loaded from a CDN.
 
+**Editing:** most of these files are generated from `../shared/` by `tools/sync.py`
+(they start with a `GENERATED` notice), so make screen changes there. See the README
+in the project root. Files specific to this app: `db.js`, `sw.js`, `pwa.js`,
+`manifest.webmanifest` and `icons/`.
+
 | File | What it is |
 |---|---|
 | `index.html` | The display: calendar, agenda, checklist, notes |

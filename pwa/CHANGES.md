@@ -35,5 +35,8 @@
 - An app icon.
 - A place in `backup.js` (`EXPORTERS`) ready for a future `.ics` calendar export.
 
+**Since then, the Docker app has caught up:** it uses the same screens (from `shared/`), so it also
+has in-page printing and the Backup panel. Backup files work in both directions.
+
 **Unchanged:** the look of every screen, the coloured dots, the agenda, the checklist,
 notes, month navigation and the "Today" button.

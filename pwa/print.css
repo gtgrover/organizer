@@ -1,3 +1,4 @@
+/* GENERATED from shared/print.css by tools/sync.py. Edit that file, not this one. */
 /* Printable month calendar. Same layout as the original pop-up print window:
    US Letter landscape, 0.25in margins, 7x6 grid, Arial, black on white. */
 #print-calendar{display:none}

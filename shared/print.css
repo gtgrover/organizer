@@ -1,0 +1,20 @@
+/* Printable month calendar. Same layout as the original pop-up print window:
+   US Letter landscape, 0.25in margins, 7x6 grid, Arial, black on white. */
+#print-calendar{display:none}
+@page{size:letter landscape;margin:.25in}
+@media print{
+	body.printing-calendar>*:not(#print-calendar){display:none!important}
+	html:has(body.printing-calendar){background:#fff;color-scheme:light}
+	body.printing-calendar{margin:0!important;padding:0!important;max-width:none!important;background:#fff;color:#111}
+	body.printing-calendar #print-calendar{display:block}
+	#print-calendar,#print-calendar *{box-sizing:border-box}
+	#print-calendar{width:10.5in;height:8in;margin:0;font-family:Arial,sans-serif;color:#111;background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+	#print-calendar h1{height:.4in;margin:0;font-size:20pt;line-height:.4in}
+	#print-calendar .pc-weekdays,#print-calendar .pc-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+	#print-calendar .pc-weekdays{height:.3in;align-items:center;text-align:center;font-size:9pt;font-weight:700}
+	#print-calendar .pc-month-grid{height:7.3in;grid-template-rows:repeat(6,minmax(0,1fr));border-top:1px solid #333;border-left:1px solid #333}
+	#print-calendar .pc-day{min-width:0;min-height:0;overflow:hidden;padding:.045in;border-right:1px solid #333;border-bottom:1px solid #333}
+	#print-calendar .pc-day-number{margin-bottom:.025in;font-size:9pt;font-weight:700}
+	#print-calendar .pc-event{margin:.02in 0;font-size:7.5pt;line-height:1.15;overflow-wrap:anywhere}
+	#print-calendar .pc-time{font-weight:700}
+}

@@ -18,7 +18,7 @@
 	const DB_VERSION = 1;
 	const SCHEMA_VERSION = 1; // version of the export/import file format
 	const APP_ID = 'personal-organizer';
-	const LEGACY_APP_IDS = ['home-organizer']; // files made before the rename
+	const LEGACY_APP_IDS = ['home-organizer']; // backups from the Docker Home Organizer (same format)
 
 	const CATEGORIES = ['Home', 'Personal', 'Errands', 'Other'];
 	const COLORS = ['blue', 'red', 'green', 'yellow', 'purple', 'orange'];

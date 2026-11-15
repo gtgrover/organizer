@@ -1,10 +1,12 @@
-<!doctype html>
-<html lang="en">
+<!doctype html><!-- GENERATED from shared/control.html by tools/sync.py. Edit that file, not this one. -->
+<html lang="en" data-app="home-organizer">
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width,initial-scale=1">
 	<title>Home Organizer Controller</title>
 	<link rel="stylesheet" href="/static/common.css">
+	<link rel="stylesheet" href="/static/print.css">
+	
 </head>
 <body style="max-width:650px;margin:auto">
 	<header>
@@ -65,7 +67,25 @@
 		<textarea id="notes" rows="5" maxlength="4000"></textarea>
 		<button id="save-notes" style="margin-top:8px">Save notes</button>
 	</section>
+	<section class="panel" style="margin-top:14px">
+		<h2>Backup</h2>
+		<p class="muted" style="margin-top:0">Download everything in this organizer as a file, or load one back in. Backup files also work with the offline Personal Organizer app.</p>
+		<button id="export-data" type="button" style="width:100%">Export backup file</button>
+		<label for="import-file">Import a backup file</label>
+		<input id="import-file" type="file" accept=".json,application/json">
+		<label for="import-mode">When importing</label>
+		<select id="import-mode">
+			<option value="merge">Merge into my data (no duplicates)</option>
+			<option value="replace">Replace all my data</option>
+		</select>
+		<button id="import-data" type="button" style="margin-top:8px;width:100%">Import</button>
+		<p id="backup-status" class="status" role="status"></p>
+	</section>
+	<div id="print-calendar" aria-hidden="true"></div>
+	<script src="/static/db-server.js"></script>
 	<script src="/static/common.js"></script>
+	<script src="/static/backup.js"></script>
+	
 	<script>
 		let editingEventId = null;
 		$('#day').value = localDay();
@@ -97,6 +117,8 @@
 			$('#event-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
 		}
 
+		// Same letter-landscape month grid as before, but printed from this page
+		// (pop-up windows are unreliable in home-screen apps on iPhone/iPad).
 		function printMonth() {
 			const [year, month] = ($('#print-month').value || localDay().slice(0, 7)).split('-').map(Number);
 			const monthDate = new Date(year, month - 1, 1, 12);
@@ -105,64 +127,48 @@
 			const daysInMonth = new Date(year, month, 0).getDate();
 			const dayCells = Array.from({ length: 42 }, (_, index) => {
 				const dayNumber = index - firstWeekday + 1;
-				if (dayNumber < 1 || dayNumber > daysInMonth) return '<div class="day outside"></div>';
+				if (dayNumber < 1 || dayNumber > daysInMonth) return '<div class="pc-day outside"></div>';
 				const day = `${year}-${String(month).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
 				const events = state.events.filter(event => event.day === day);
 				const eventMarkup = events.map(event => {
-					const time = event.time ? `<span class="time">${esc(formatTime(event.time))}</span> ` : '';
-					return `<div class="print-event">${time}${esc(event.title)}</div>`;
+					const time = event.time ? `<span class="pc-time">${esc(formatTime(event.time))}</span> ` : '';
+					return `<div class="pc-event">${time}${esc(event.title)}</div>`;
 				}).join('');
-				return `<div class="day"><div class="day-number">${dayNumber}</div>${eventMarkup}</div>`;
+				return `<div class="pc-day"><div class="pc-day-number">${dayNumber}</div>${eventMarkup}</div>`;
 			}).join('');
 			const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-				.map(day => `<div class="weekday">${day}</div>`).join('');
-			const printWindow = window.open('', '_blank');
-			if (!printWindow) {
-				alert('Allow pop-ups to print the calendar.');
-				return;
-			}
-			printWindow.onload = () => {
-				printWindow.focus();
-				printWindow.print();
-			};
-			printWindow.document.open();
-			printWindow.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(monthLabel)} Calendar</title><style>
-				@page { size: letter landscape; margin: .25in; }
-				* { box-sizing: border-box; }
-				html, body { margin: 0; width: 10.5in; height: 8in; font-family: Arial, sans-serif; color: #111; }
-				h1 { height: .4in; margin: 0; font-size: 20pt; line-height: .4in; }
-				.weekdays, .month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-				.weekdays { height: .3in; align-items: center; text-align: center; font-size: 9pt; font-weight: 700; }
-				.month-grid { height: 7.3in; grid-template-rows: repeat(6, minmax(0, 1fr)); border-top: 1px solid #333; border-left: 1px solid #333; }
-				.day { min-width: 0; min-height: 0; overflow: hidden; padding: .045in; border-right: 1px solid #333; border-bottom: 1px solid #333; }
-				.day-number { margin-bottom: .025in; font-size: 9pt; font-weight: 700; }
-				.print-event { margin: .02in 0; font-size: 7.5pt; line-height: 1.15; overflow-wrap: anywhere; }
-				.time { font-weight: 700; }
-				@media print { html, body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
-			</style></head><body><h1>${esc(monthLabel)}</h1><div class="weekdays">${weekdays}</div><div class="month-grid">${dayCells}</div></body></html>`);
-			printWindow.document.close();
+				.map(day => `<div class="pc-weekday">${day}</div>`).join('');
+			$('#print-calendar').innerHTML = `<h1>${esc(monthLabel)}</h1><div class="pc-weekdays">${weekdays}</div><div class="pc-month-grid">${dayCells}</div>`;
+			const pageTitle = document.title;
+			document.title = `${monthLabel} Calendar`; // used as the PDF name / print header
+			document.body.classList.add('printing-calendar');
+			window.addEventListener('afterprint', () => {
+				document.body.classList.remove('printing-calendar');
+				document.title = pageTitle;
+			}, { once: true });
+			window.print();
 		}
 
 		function render() {
 			const selected = state.selected_day || localDay();
 			if (document.activeElement !== $('#day')) $('#day').value = selected;
-			$('#tasks').innerHTML = state.tasks.map(task => `<div class="task"><label><input data-task="${task.id}" type="checkbox" ${task.done ? 'checked' : ''}>${esc(task.title)}</label><button data-del-task="${task.id}">Delete</button></div>`).join('') || '<p class="muted">No tasks yet.</p>';
+			$('#tasks').innerHTML = state.tasks.map(task => `<div class="task"><label><input data-task="${esc(task.id)}" type="checkbox" ${task.done ? 'checked' : ''}>${esc(task.title)}</label><button data-del-task="${esc(task.id)}">Delete</button></div>`).join('') || '<p class="muted">No tasks yet.</p>';
 			bindTasks($('#tasks'));
 			document.querySelectorAll('[data-del-task]').forEach(button => {
-				button.onclick = () => api('tasks/' + button.dataset.delTask, 'DELETE').catch(alert);
+				button.onclick = () => DB.deleteTask(button.dataset.delTask).catch(showError);
 			});
 			if (document.activeElement !== $('#notes')) $('#notes').value = state.notes;
 
 			const events = state.events.filter(event => event.day === $('#day').value);
-			$('#events').innerHTML = events.map(event => `<div class="event"><small>${esc(event.day)} · ${esc(formatTime(event.time))} · ${esc(event.category)}</small><div>${esc(event.title)}</div><div class="actions"><button type="button" data-edit-event="${event.id}">Edit</button><button type="button" data-del-event="${event.id}">Delete</button></div></div>`).join('') || '<p class="muted">No events for this date.</p>';
+			$('#events').innerHTML = events.map(event => `<div class="event"><small>${esc(event.day)} · ${esc(formatTime(event.time))} · ${esc(event.category)}</small><div>${esc(event.title)}</div><div class="actions"><button type="button" data-edit-event="${esc(event.id)}">Edit</button><button type="button" data-del-event="${esc(event.id)}">Delete</button></div></div>`).join('') || '<p class="muted">No events for this date.</p>';
 			document.querySelectorAll('[data-edit-event]').forEach(button => {
-				button.onclick = () => beginEventEdit(Number(button.dataset.editEvent));
+				button.onclick = () => beginEventEdit(button.dataset.editEvent);
 			});
 			document.querySelectorAll('[data-del-event]').forEach(button => {
 				button.onclick = async () => {
-					const eventId = Number(button.dataset.delEvent);
+					const eventId = button.dataset.delEvent;
 					try {
-						await api('events/' + eventId, 'DELETE');
+						await DB.deleteEvent(eventId);
 						if (editingEventId === eventId) resetEventForm();
 					} catch (error) {
 						alert(error.message);
@@ -171,11 +177,17 @@
 			});
 		}
 
+		// Used by pwa.js: don't auto-reload for an app update while something is being typed.
+		window.hasUnsavedInput = () =>
+			editingEventId !== null ||
+			!!$('#event-title').value || !!$('#event-description').value || !!$('#task-title').value ||
+			$('#notes').value !== (state.notes || '') || !!$('#import-file').value;
+
 		connect(render);
 		document.querySelectorAll('[data-view]').forEach(button => {
-			button.onclick = () => api('view', 'PUT', { view: button.dataset.view, selected_day: $('#day').value }).catch(alert);
+			button.onclick = () => DB.setView(button.dataset.view, $('#day').value).catch(showError);
 		});
-		$('#show-day').onclick = () => api('view', 'PUT', { view: 'overview', selected_day: $('#day').value }).catch(alert);
+		$('#show-day').onclick = () => DB.setView('overview', $('#day').value).catch(showError);
 		$('#print-month-calendar').onclick = printMonth;
 		$('#day').onchange = render;
 		$('#cancel-event-edit').onclick = resetEventForm;
@@ -191,7 +203,8 @@
 				category: $('#event-category').value
 			};
 			try {
-				await api(isEditing ? 'events/' + editingEventId : 'events', isEditing ? 'PUT' : 'POST', payload);
+				if (isEditing) await DB.updateEvent(editingEventId, payload);
+				else await DB.addEvent(payload);
 				if (isEditing) resetEventForm();
 				else {
 					$('#event-title').value = '';
@@ -204,13 +217,35 @@
 		$('#task-form').onsubmit = async event => {
 			event.preventDefault();
 			try {
-				await api('tasks', 'POST', { title: $('#task-title').value });
+				await DB.addTask($('#task-title').value);
 				$('#task-title').value = '';
 			} catch (error) {
 				alert(error.message);
 			}
 		};
-		$('#save-notes').onclick = () => api('notes', 'PUT', { content: $('#notes').value }).catch(alert);
+		$('#save-notes').onclick = () => DB.saveNotes($('#notes').value).catch(showError);
+
+		$('#export-data').onclick = async () => {
+			try {
+				const name = await Backup.exportAs('json');
+				$('#backup-status').textContent = `Exported ${name}.`;
+			} catch (error) {
+				if (error.name !== 'AbortError') alert(error.message);
+			}
+		};
+		$('#import-data').onclick = async () => {
+			const file = $('#import-file').files[0];
+			const mode = $('#import-mode').value;
+			if (!file) { alert('Choose a backup file first.'); return; }
+			if (mode === 'replace' && !confirm('Replace ALL events, checklist items and notes on this device with the contents of this file? This cannot be undone.')) return;
+			try {
+				const result = await Backup.importFile(file, mode);
+				$('#backup-status').textContent = Backup.describe(result);
+				$('#import-file').value = '';
+			} catch (error) {
+				alert('Import failed: ' + error.message);
+			}
+		};
 	</script>
 </body>
 </html>
