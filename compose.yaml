@@ -1,0 +1,8 @@
+services:
+  organizer:
+    build: .
+    ports:
+      - "8280:8280"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

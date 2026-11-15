@@ -1,0 +1,11 @@
+# Household data: never commit (personal, and changes constantly)
+data/
+
+# Local test tooling and output
+.venv-test/
+tools/test-output/
+
+# Python / OS clutter
+__pycache__/
+*.pyc
+.DS_Store

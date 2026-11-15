@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>Personal Organizer Controller</title>
+	<link rel="stylesheet" href="common.css">
+	<link rel="stylesheet" href="print.css">
+	<link rel="manifest" href="manifest.webmanifest">
+	<meta name="theme-color" content="#101724">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black">
+	<meta name="apple-mobile-web-app-title" content="Organizer">
+	<link rel="icon" href="icons/icon-192.png">
+	<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body style="max-width:650px;margin:auto">
+	<header>
+		<div><h1>Control</h1><div class="muted">Personal organizer</div></div>
+		<a class="status-button" href="index.html" aria-label="Open Display"><span aria-hidden="true">▣</span> Display</a>
+	</header>
+	<section class="panel">
+		<h2>Control wall display</h2>
+		<div class="actions">
+			<button data-view="overview">Overview</button>
+			<button data-view="calendar">Calendar</button>
+			<button data-view="tasks">Tasks</button>
+			<button data-view="notes">Notes</button>
+		</div>
+		<label for="day">Selected date</label>
+		<input id="day" type="date">
+		<button id="show-day" style="margin-top:8px">Show date on display</button>
+		<label for="print-month">Month to print</label>
+		<input id="print-month" type="month">
+		<button id="print-month-calendar" type="button" style="margin-top:8px">Print selected month</button>
+	</section>
+	<section class="panel" style="margin-top:14px">
+		<h2 id="event-form-heading">New calendar event</h2>
+		<form id="event-form">
+			<label for="event-day">Date</label>
+			<input id="event-day" type="date" required>
+			<label for="event-time">Time (optional)</label>
+			<input id="event-time" type="time">
+			<label for="event-title">Event</label>
+			<input id="event-title" maxlength="160" required placeholder="Appointment or activity">
+			<label for="event-description">Description (not shown on display or print)</label>
+			<textarea id="event-description" rows="3" maxlength="1000" placeholder="Extra details for the household"></textarea>
+			<label for="event-color">Calendar dot color</label>
+			<select id="event-color">
+				<option value="blue">Blue</option><option value="red">Red</option><option value="green">Green</option><option value="yellow">Yellow</option><option value="purple">Purple</option><option value="orange">Orange</option>
+			</select>
+			<label for="event-category">Category</label>
+			<select id="event-category">
+				<option>Home</option><option>Personal</option><option>Errands</option><option>Other</option>
+			</select>
+			<div class="actions" style="margin-top:10px">
+				<button id="event-submit" type="submit">Add event</button>
+				<button id="cancel-event-edit" type="button" hidden>Cancel edit</button>
+			</div>
+		</form>
+		<div id="events"></div>
+	</section>
+	<section class="panel" style="margin-top:14px">
+		<h2>Checklist</h2>
+		<div id="tasks"></div>
+		<form id="task-form" class="actions" style="margin-top:10px">
+			<input id="task-title" placeholder="New item" maxlength="160" required>
+			<button type="submit">Add</button>
+		</form>
+	</section>
+	<section class="panel" style="margin-top:14px">
+		<h2>Household notes</h2>
+		<textarea id="notes" rows="5" maxlength="4000"></textarea>
+		<button id="save-notes" style="margin-top:8px">Save notes</button>
+	</section>
+	<section class="panel" style="margin-top:14px">
+		<h2>Backup</h2>
+		<p class="muted" style="margin-top:0">Your data is stored only on this device. Export a backup now and then, or to share your calendar with someone else.</p>
+		<button id="export-data" type="button" style="width:100%">Export backup file</button>
+		<label for="import-file">Import a backup file</label>
+		<input id="import-file" type="file" accept=".json,application/json">
+		<label for="import-mode">When importing</label>
+		<select id="import-mode">
+			<option value="merge">Merge into my data (no duplicates)</option>
+			<option value="replace">Replace all my data</option>
+		</select>
+		<button id="import-data" type="button" style="margin-top:8px;width:100%">Import</button>
+		<p id="backup-status" class="status" role="status"></p>
+	</section>
+	<div id="print-calendar" aria-hidden="true"></div>
+	<script src="db.js"></script>
+	<script src="common.js"></script>
+	<script src="backup.js"></script>
+	<script src="pwa.js"></script>
+	<script>
+		let editingEventId = null;
+		$('#day').value = localDay();
+		$('#print-month').value = localDay().slice(0, 7);
+		$('#event-day').value = localDay();
+
+		function resetEventForm() {
+			editingEventId = null;
+			$('#event-form').reset();
+			$('#event-day').value = localDay();
+			$('#event-form-heading').textContent = 'New calendar event';
+			$('#event-submit').textContent = 'Add event';
+			$('#cancel-event-edit').hidden = true;
+		}
+
+		function beginEventEdit(eventId) {
+			const event = state.events.find(item => item.id === eventId);
+			if (!event) return;
+			editingEventId = eventId;
+			$('#event-day').value = event.day;
+			$('#event-time').value = event.time;
+			$('#event-title').value = event.title;
+			$('#event-description').value = event.description || '';
+			$('#event-color').value = event.color || 'blue';
+			$('#event-category').value = event.category;
+			$('#event-form-heading').textContent = 'Edit calendar event';
+			$('#event-submit').textContent = 'Save changes';
+			$('#cancel-event-edit').hidden = false;
+			$('#event-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}
+
+		// Same letter-landscape month grid as before, but printed from this page
+		// (pop-up windows are unreliable in home-screen apps on iPhone/iPad).
+		function printMonth() {
+			const [year, month] = ($('#print-month').value || localDay().slice(0, 7)).split('-').map(Number);
+			const monthDate = new Date(year, month - 1, 1, 12);
+			const monthLabel = monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+			const firstWeekday = new Date(year, month - 1, 1).getDay();
+			const daysInMonth = new Date(year, month, 0).getDate();
+			const dayCells = Array.from({ length: 42 }, (_, index) => {
+				const dayNumber = index - firstWeekday + 1;
+				if (dayNumber < 1 || dayNumber > daysInMonth) return '<div class="pc-day outside"></div>';
+				const day = `${year}-${String(month).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
+				const events = state.events.filter(event => event.day === day);
+				const eventMarkup = events.map(event => {
+					const time = event.time ? `<span class="pc-time">${esc(formatTime(event.time))}</span> ` : '';
+					return `<div class="pc-event">${time}${esc(event.title)}</div>`;
+				}).join('');
+				return `<div class="pc-day"><div class="pc-day-number">${dayNumber}</div>${eventMarkup}</div>`;
+			}).join('');
+			const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+				.map(day => `<div class="pc-weekday">${day}</div>`).join('');
+			$('#print-calendar').innerHTML = `<h1>${esc(monthLabel)}</h1><div class="pc-weekdays">${weekdays}</div><div class="pc-month-grid">${dayCells}</div>`;
+			const pageTitle = document.title;
+			document.title = `${monthLabel} Calendar`; // used as the PDF name / print header
+			document.body.classList.add('printing-calendar');
+			window.addEventListener('afterprint', () => {
+				document.body.classList.remove('printing-calendar');
+				document.title = pageTitle;
+			}, { once: true });
+			window.print();
+		}
+
+		function render() {
+			const selected = state.selected_day || localDay();
+			if (document.activeElement !== $('#day')) $('#day').value = selected;
+			$('#tasks').innerHTML = state.tasks.map(task => `<div class="task"><label><input data-task="${esc(task.id)}" type="checkbox" ${task.done ? 'checked' : ''}>${esc(task.title)}</label><button data-del-task="${esc(task.id)}">Delete</button></div>`).join('') || '<p class="muted">No tasks yet.</p>';
+			bindTasks($('#tasks'));
+			document.querySelectorAll('[data-del-task]').forEach(button => {
+				button.onclick = () => DB.deleteTask(button.dataset.delTask).catch(showError);
+			});
+			if (document.activeElement !== $('#notes')) $('#notes').value = state.notes;
+
+			const events = state.events.filter(event => event.day === $('#day').value);
+			$('#events').innerHTML = events.map(event => `<div class="event"><small>${esc(event.day)} · ${esc(formatTime(event.time))} · ${esc(event.category)}</small><div>${esc(event.title)}</div><div class="actions"><button type="button" data-edit-event="${esc(event.id)}">Edit</button><button type="button" data-del-event="${esc(event.id)}">Delete</button></div></div>`).join('') || '<p class="muted">No events for this date.</p>';
+			document.querySelectorAll('[data-edit-event]').forEach(button => {
+				button.onclick = () => beginEventEdit(button.dataset.editEvent);
+			});
+			document.querySelectorAll('[data-del-event]').forEach(button => {
+				button.onclick = async () => {
+					const eventId = button.dataset.delEvent;
+					try {
+						await DB.deleteEvent(eventId);
+						if (editingEventId === eventId) resetEventForm();
+					} catch (error) {
+						alert(error.message);
+					}
+				};
+			});
+		}
+
+		// Used by pwa.js: don't auto-reload for an app update while something is being typed.
+		window.hasUnsavedInput = () =>
+			editingEventId !== null ||
+			!!$('#event-title').value || !!$('#event-description').value || !!$('#task-title').value ||
+			$('#notes').value !== (state.notes || '') || !!$('#import-file').value;
+
+		connect(render);
+		document.querySelectorAll('[data-view]').forEach(button => {
+			button.onclick = () => DB.setView(button.dataset.view, $('#day').value).catch(showError);
+		});
+		$('#show-day').onclick = () => DB.setView('overview', $('#day').value).catch(showError);
+		$('#print-month-calendar').onclick = printMonth;
+		$('#day').onchange = render;
+		$('#cancel-event-edit').onclick = resetEventForm;
+		$('#event-form').onsubmit = async event => {
+			event.preventDefault();
+			const isEditing = editingEventId !== null;
+			const payload = {
+				day: $('#event-day').value,
+				time: $('#event-time').value,
+				title: $('#event-title').value,
+				description: $('#event-description').value,
+				color: $('#event-color').value,
+				category: $('#event-category').value
+			};
+			try {
+				if (isEditing) await DB.updateEvent(editingEventId, payload);
+				else await DB.addEvent(payload);
+				if (isEditing) resetEventForm();
+				else {
+					$('#event-title').value = '';
+					$('#event-description').value = '';
+				}
+			} catch (error) {
+				alert(error.message);
+			}
+		};
+		$('#task-form').onsubmit = async event => {
+			event.preventDefault();
+			try {
+				await DB.addTask($('#task-title').value);
+				$('#task-title').value = '';
+			} catch (error) {
+				alert(error.message);
+			}
+		};
+		$('#save-notes').onclick = () => DB.saveNotes($('#notes').value).catch(showError);
+
+		$('#export-data').onclick = async () => {
+			try {
+				const name = await Backup.exportAs('json');
+				$('#backup-status').textContent = `Exported ${name}.`;
+			} catch (error) {
+				if (error.name !== 'AbortError') alert(error.message);
+			}
+		};
+		$('#import-data').onclick = async () => {
+			const file = $('#import-file').files[0];
+			const mode = $('#import-mode').value;
+			if (!file) { alert('Choose a backup file first.'); return; }
+			if (mode === 'replace' && !confirm('Replace ALL events, checklist items and notes on this device with the contents of this file? This cannot be undone.')) return;
+			try {
+				const result = await Backup.importFile(file, mode);
+				$('#backup-status').textContent = Backup.describe(result);
+				$('#import-file').value = '';
+			} catch (error) {
+				alert('Import failed: ' + error.message);
+			}
+		};
+	</script>
+</body>
+</html>
