@@ -21,9 +21,6 @@
 			<button data-view="tasks">Tasks</button>
 			<button data-view="notes">Notes</button>
 		</div>
-		<label for="day">Selected date</label>
-		<input id="day" type="date">
-		<button id="show-day" style="margin-top:8px">Show date on display</button>
 		<label for="print-month">Month to print</label>
 		<input id="print-month" type="month">
 		<button id="print-month-calendar" type="button" style="margin-top:8px">Print selected month</button>
@@ -89,23 +86,24 @@
 	
 	<script>
 		let editingEventId = null;
-		$('#day').value = localDay();
+		// The day selected on the display (chosen there with its calendar).
+		const selectedDay = () => state.selected_day || localDay();
 		$('#print-month').value = localDay().slice(0, 7);
 		$('#event-day').value = localDay();
-		// The new-event date follows the day selected on the display (the "Selected date"
-		// field), until someone picks a date in the event form themselves.
+		// The new-event date follows the day selected on the display, until someone
+		// picks a date in the event form themselves.
 		let eventDayChosen = false;
 		['input', 'change'].forEach(type => $('#event-day').addEventListener(type, () => { eventDayChosen = true; }));
 		function followSelectedDay() {
 			if (editingEventId !== null || eventDayChosen || document.activeElement === $('#event-day')) return;
-			$('#event-day').value = $('#day').value || localDay();
+			$('#event-day').value = selectedDay();
 		}
 
 		function resetEventForm() {
 			editingEventId = null;
 			$('#event-form').reset();
 			eventDayChosen = false;
-			$('#event-day').value = $('#day').value || localDay();
+			$('#event-day').value = selectedDay();
 			$('#event-form-heading').textContent = 'New calendar event';
 			$('#event-submit').textContent = 'Add event';
 			$('#cancel-event-edit').hidden = true;
@@ -161,8 +159,6 @@
 		const pageTitle = document.title;
 
 		function render() {
-			const selected = state.selected_day || localDay();
-			if (document.activeElement !== $('#day')) $('#day').value = selected;
 			followSelectedDay();
 			$('#tasks').innerHTML = state.tasks.map(task => `<div class="task"><label><input data-task="${esc(task.id)}" type="checkbox" ${task.done ? 'checked' : ''}>${esc(task.title)}</label><button data-del-task="${esc(task.id)}">Delete</button></div>`).join('') || '<p class="muted">No tasks yet.</p>';
 			bindTasks($('#tasks'));
@@ -171,7 +167,7 @@
 			});
 			if (document.activeElement !== $('#notes')) $('#notes').value = state.notes;
 
-			const events = state.events.filter(event => event.day === $('#day').value);
+			const events = state.events.filter(event => event.day === selectedDay());
 			$('#events').innerHTML = events.map(event => `<div class="event"><small>${esc(event.day)} · ${esc(formatTime(event.time))} · ${esc(event.category)}</small><div>${esc(event.title)}</div><div class="actions"><button type="button" data-edit-event="${esc(event.id)}">Edit</button><button type="button" data-del-event="${esc(event.id)}">Delete</button></div></div>`).join('') || '<p class="muted">No events for this date.</p>';
 			document.querySelectorAll('[data-edit-event]').forEach(button => {
 				button.onclick = () => beginEventEdit(button.dataset.editEvent);
@@ -230,11 +226,9 @@
 
 		connect(render);
 		document.querySelectorAll('[data-view]').forEach(button => {
-			button.onclick = () => DB.setView(button.dataset.view, $('#day').value).catch(showError);
+			button.onclick = () => DB.setView(button.dataset.view).catch(showError);
 		});
-		$('#show-day').onclick = () => DB.setView('overview', $('#day').value).catch(showError);
 		$('#print-month-calendar').onclick = printMonth;
-		$('#day').onchange = render;
 		$('#cancel-event-edit').onclick = resetEventForm;
 		$('#event-form').onsubmit = async event => {
 			event.preventDefault();

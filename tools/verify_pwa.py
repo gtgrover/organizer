@@ -150,7 +150,8 @@ try:
         disp.click(f'[data-day="{today[:8]}03"]' if today[8:] != '03' else f'[data-day="{today[:8]}04"]')
         page.wait_for_timeout(800)
         check('...is not overwritten by later display selections', page.input_value('#event-day') == today)
-        disp.click(f'[data-day="{today}"]'); page.wait_for_function(f"document.querySelector('#day').value==='{today}'")
+        check('Selected date box removed from Control', page.locator('#day, #show-day').count() == 0)
+        disp.click(f'[data-day="{today}"]'); page.wait_for_function(f"state.selected_day==='{today}'")
         page.reload(); page.wait_for_function('state.tasks.length>0')
         disp.close()
 
