@@ -52,8 +52,10 @@ function printMonth(year,month){
 	if(!printMonth.pageTitle)printMonth.pageTitle=document.title;
 	document.title=`${monthLabel} Calendar`; // used as the PDF name / print header
 	setTimeout(()=>window.addEventListener('pointerdown',()=>{document.title=printMonth.pageTitle},{once:true}),1000);
-	// let the browser lay out the calendar before the print dialog takes its snapshot
-	requestAnimationFrame(()=>setTimeout(()=>window.print(),50));
+	// Print right away, inside the tap. Any delay here (even a frame) makes Safari treat it
+	// as the page printing on its own and show "This website has been blocked from
+	// automatically printing". The browser lays out the new calendar before printing anyway.
+	window.print();
 }
 function taskRows(){return state.tasks.length?state.tasks.map(t=>`<div class="task"><label><input type="checkbox" data-task="${esc(t.id)}" ${t.done?'checked':''}>${esc(t.title)}</label></div>`).join(''):'<p class="muted">No tasks yet.</p>'}
 function bindTasks(root=document){root.querySelectorAll('[data-task]').forEach(x=>x.onchange=()=>DB.setTaskDone(x.dataset.task,x.checked).catch(showError))}

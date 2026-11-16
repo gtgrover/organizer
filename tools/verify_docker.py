@@ -223,6 +223,7 @@ try:
         # ---- print: Print button inside the display calendar ----
         check('Control page has no print controls', ctl.locator('#print-month, #print-month-calendar').count() == 0)
         disp.click('#today'); disp.wait_for_function(f"state.selected_day==='{today}'")
+        check('Print runs directly from the tap (no Safari "blocked printing" prompt)', disp.evaluate("""(()=>{window.__printed=false;const keep=window.print;window.print=()=>{window.__printed=true};document.querySelector('.print-cell').click();const r=window.__printed;window.print=keep;return r})()"""))
         disp.evaluate(SAFARI_PRINT); disp.click('.print-cell'); disp.wait_for_timeout(300)
         disp.emulate_media(media='print')
         check('print shows calendar, not the screen (Safari timing)', disp.is_visible('#print-calendar') and not disp.is_visible('header'))

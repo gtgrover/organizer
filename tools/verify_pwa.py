@@ -321,6 +321,8 @@ try:
             pg.evaluate(f"DB.setView('overview','{day}')"); pg.wait_for_function(f"state.selected_day==='{day}'"); pg.wait_for_timeout(200)
             got = pg.evaluate(where)
             check(f'display Print button: {label}', got == expect, str(got))
+        # print() must run inside the tap itself, or Safari blocks it as "automatic printing"
+        check('Print runs directly from the tap (no Safari "blocked printing" prompt)', pg.evaluate("""(()=>{window.__printed=false;const keep=window.print;window.print=()=>{window.__printed=true};document.querySelector('.print-cell').click();const r=window.__printed;window.print=keep;return r})()"""))
         pg.evaluate(SAFARI_PRINT); pg.click('.print-cell'); pg.wait_for_timeout(300); pg.emulate_media(media='print')
         check('display Print button prints the shown month (Safari timing)', pg.is_visible('#print-calendar') and pg.inner_text('#print-calendar h1') == 'February 2026' and not pg.is_visible('header'))
         c.close()

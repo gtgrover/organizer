@@ -3,7 +3,7 @@
 // TO SHIP AN UPDATE: change VERSION below (any new value) and deploy.
 // Browsers notice the changed sw.js, download the new files, and open pages reload
 // themselves. If VERSION is not changed, users keep the old cached files.
-const VERSION = '2026-11-16.3';
+const VERSION = '2026-11-16.4';
 const CACHE = 'personal-organizer-' + VERSION;
 
 const FILES = [
