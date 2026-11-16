@@ -289,6 +289,20 @@ try:
             c.close()
         check('dates round-trip across timezones', days['Pacific/Auckland'] == days['America/Los_Angeles'] == '2026-11-15', str(days))
 
+        # ---- Print button inside the display calendar ----
+        c = browser.new_context(viewport={'width': 1280, 'height': 900}); pg = c.new_page()
+        pg.goto(BASE); pg.wait_for_timeout(500)
+        where = "(()=>{const c=document.querySelector('.print-cell');const cells=[...document.querySelectorAll('#calendar > *')].slice(7);return [cells.indexOf(c),cells.length,c.style.gridColumn]})()"
+        for day, expect, label in [('2026-11-15', [30, 31, 'span 5'], 'bottom-right after last day'),
+                                   ('2026-10-15', [0, 32, 'span 4'], 'top-left when month ends on Saturday'),
+                                   ('2026-02-10', [28, 29, 'span 7'], 'own row when month has no empty boxes')]:
+            pg.evaluate(f"DB.setView('overview','{day}')"); pg.wait_for_function(f"state.selected_day==='{day}'"); pg.wait_for_timeout(200)
+            got = pg.evaluate(where)
+            check(f'display Print button: {label}', got == expect, str(got))
+        pg.evaluate(SAFARI_PRINT); pg.click('.print-cell'); pg.wait_for_timeout(300); pg.emulate_media(media='print')
+        check('display Print button prints the shown month (Safari timing)', pg.is_visible('#print-calendar') and pg.inner_text('#print-calendar h1') == 'February 2026' and not pg.is_visible('header'))
+        c.close()
+
         # ---- app update reaches an open page ----
         upd = S / 'pwa-update'
         shutil.rmtree(upd, ignore_errors=True); shutil.copytree(PWA, upd)

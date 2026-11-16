@@ -125,38 +125,11 @@
 			$('#event-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
 		}
 
-		// Same letter-landscape month grid as before, but printed from this page
-		// (pop-up windows are unreliable in home-screen apps on iPhone/iPad).
-		function printMonth() {
+		// Prints the month chosen in "Month to print" (printMonth is in common.js).
+		function printSelectedMonth() {
 			const [year, month] = ($('#print-month').value || localDay().slice(0, 7)).split('-').map(Number);
-			const monthDate = new Date(year, month - 1, 1, 12);
-			const monthLabel = monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-			const firstWeekday = new Date(year, month - 1, 1).getDay();
-			const daysInMonth = new Date(year, month, 0).getDate();
-			const dayCells = Array.from({ length: 42 }, (_, index) => {
-				const dayNumber = index - firstWeekday + 1;
-				if (dayNumber < 1 || dayNumber > daysInMonth) return '<div class="pc-day outside"></div>';
-				const day = `${year}-${String(month).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
-				const events = state.events.filter(event => event.day === day);
-				const eventMarkup = events.map(event => {
-					const time = event.time ? `<span class="pc-time">${esc(formatTime(event.time))}</span> ` : '';
-					return `<div class="pc-event">${time}${esc(event.title)}</div>`;
-				}).join('');
-				return `<div class="pc-day"><div class="pc-day-number">${dayNumber}</div>${eventMarkup}</div>`;
-			}).join('');
-			const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-				.map(day => `<div class="pc-weekday">${day}</div>`).join('');
-			$('#print-calendar').innerHTML = `<h1>${esc(monthLabel)}</h1><div class="pc-weekdays">${weekdays}</div><div class="pc-month-grid">${dayCells}</div>`;
-			// Once #print-calendar has content, print.css prints only the calendar. Nothing is
-			// switched back after printing: Safari (iPhone and Mac) reports "printing finished"
-			// before it has actually printed, which used to put the normal screen on paper.
-			document.title = `${monthLabel} Calendar`; // used as the PDF name / print header
-			const restoreTitle = () => { document.title = pageTitle; };
-			setTimeout(() => window.addEventListener('pointerdown', restoreTitle, { once: true }), 1000);
-			// let the browser lay out the calendar before the print dialog takes its snapshot
-			requestAnimationFrame(() => setTimeout(() => window.print(), 50));
+			printMonth(year, month);
 		}
-		const pageTitle = document.title;
 
 		function render() {
 			followSelectedDay();
@@ -228,7 +201,7 @@
 		document.querySelectorAll('[data-view]').forEach(button => {
 			button.onclick = () => DB.setView(button.dataset.view).catch(showError);
 		});
-		$('#print-month-calendar').onclick = printMonth;
+		$('#print-month-calendar').onclick = printSelectedMonth;
 		$('#cancel-event-edit').onclick = resetEventForm;
 		$('#event-form').onsubmit = async event => {
 			event.preventDefault();
