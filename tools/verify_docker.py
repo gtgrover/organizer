@@ -33,6 +33,26 @@ results = []
 # Print the way Safari behaves: print() returns at once and 'afterprint' fires immediately.
 SAFARI_PRINT = "window.print=()=>{window.dispatchEvent(new Event('beforeprint'));window.dispatchEvent(new Event('afterprint'))}"
 
+def print_shot(ctx, pg, display_url, control_url, path, size):
+    """Screenshot the printed month for the day the display is showing. Uses the Print
+    button in the display calendar; falls back to Control's 'Print selected month' (in-page
+    or older pop-up) so older reference versions of the app can still be compared."""
+    pg.set_viewport_size(size)
+    pg.goto(display_url); pg.wait_for_timeout(1200)
+    if pg.locator('.print-cell').count():
+        pg.evaluate(SAFARI_PRINT); pg.click('.print-cell'); pg.wait_for_timeout(300)
+        pg.emulate_media(media='print'); pg.screenshot(path=path); pg.emulate_media(media='screen')
+        return
+    month = pg.evaluate('(state.selected_day || localDay()).slice(0, 7)')
+    pg.goto(control_url); pg.wait_for_timeout(1000); pg.fill('#print-month', month)
+    if pg.evaluate("!!document.querySelector('#print-calendar')"):
+        pg.evaluate(SAFARI_PRINT); pg.click('#print-month-calendar'); pg.wait_for_timeout(300)
+        pg.emulate_media(media='print'); pg.screenshot(path=path); pg.emulate_media(media='screen')
+    else:
+        with ctx.expect_page() as pop:
+            pg.click('#print-month-calendar')
+        w = pop.value; w.wait_for_load_state(); w.set_viewport_size(size); w.emulate_media(media='print'); w.screenshot(path=path)
+
 def check(name, cond, detail=''):
     results.append((name, bool(cond)))
     print(('PASS ' if cond else 'FAIL ') + name + (f'  [{detail}]' if detail and not cond else ''))
@@ -200,12 +220,14 @@ try:
         check('migration-script file merges into Docker with no duplicates', len(api('state')[1]['events']) == len(dstate['events']), ctl.inner_text('#backup-status'))
         pg.close()
 
-        # ---- print (now in-page, same as offline app) ----
-        ctl.fill('#print-month', today[:7]); ctl.evaluate(SAFARI_PRINT); ctl.click('#print-month-calendar'); ctl.wait_for_timeout(300)
-        ctl.emulate_media(media='print')
-        check('print shows calendar, not the screen (Safari timing)', ctl.is_visible('#print-calendar') and not ctl.is_visible('header'))
-        ctl.emulate_media(media='screen')
-        check('print layout built', 'Docker test edited' in ctl.inner_text('#print-calendar'))
+        # ---- print: Print button inside the display calendar ----
+        check('Control page has no print controls', ctl.locator('#print-month, #print-month-calendar').count() == 0)
+        disp.click('#today'); disp.wait_for_function(f"state.selected_day==='{today}'")
+        disp.evaluate(SAFARI_PRINT); disp.click('.print-cell'); disp.wait_for_timeout(300)
+        disp.emulate_media(media='print')
+        check('print shows calendar, not the screen (Safari timing)', disp.is_visible('#print-calendar') and not disp.is_visible('header'))
+        disp.emulate_media(media='screen')
+        check('print layout built', 'Docker test edited' in disp.inner_text('#print-calendar'))
         ctx.close()
 
         # ---- pixel comparison with the reference app (same data) ----
@@ -224,15 +246,7 @@ try:
                     c = browser.new_context(viewport={'width': 1280, 'height': 900}, timezone_id='America/Chicago'); pg = c.new_page()
                     pg.goto(base + disp_path); pg.wait_for_timeout(1500)
                     pg.screenshot(path=str(OUT / f'{label}-display.png'))
-                    pg.goto(base + ctl_path); pg.wait_for_timeout(1000); pg.fill('#print-month', today[:7])
-                    if pg.evaluate("!!document.querySelector('#print-calendar')"):  # in-page print
-                        pg.set_viewport_size(size); pg.evaluate(SAFARI_PRINT); pg.click('#print-month-calendar')
-                        pg.emulate_media(media='print'); pg.screenshot(path=str(OUT / f'{label}-print.png'))
-                    else:  # older pop-up print
-                        with c.expect_page() as pop:
-                            pg.click('#print-month-calendar')
-                        w = pop.value; w.wait_for_load_state(); w.set_viewport_size(size); w.emulate_media(media='print')
-                        w.screenshot(path=str(OUT / f'{label}-print.png'))
+                    print_shot(c, pg, base + disp_path, base + ctl_path, str(OUT / f'{label}-print.png'), size)
                     c.close()
                 for name in ('display', 'print'):
                     a = Image.open(OUT / f'old-{name}.png').convert('RGB'); b = Image.open(OUT / f'new-{name}.png').convert('RGB')

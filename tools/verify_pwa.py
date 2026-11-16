@@ -38,6 +38,26 @@ results = []
 # Print the way Safari behaves: print() returns at once and 'afterprint' fires immediately.
 SAFARI_PRINT = "window.print=()=>{window.dispatchEvent(new Event('beforeprint'));window.dispatchEvent(new Event('afterprint'))}"
 
+def print_shot(ctx, pg, display_url, control_url, path, size):
+    """Screenshot the printed month for the day the display is showing. Uses the Print
+    button in the display calendar; falls back to Control's 'Print selected month' (in-page
+    or older pop-up) so older reference versions of the app can still be compared."""
+    pg.set_viewport_size(size)
+    pg.goto(display_url); pg.wait_for_timeout(1200)
+    if pg.locator('.print-cell').count():
+        pg.evaluate(SAFARI_PRINT); pg.click('.print-cell'); pg.wait_for_timeout(300)
+        pg.emulate_media(media='print'); pg.screenshot(path=path); pg.emulate_media(media='screen')
+        return
+    month = pg.evaluate('(state.selected_day || localDay()).slice(0, 7)')
+    pg.goto(control_url); pg.wait_for_timeout(1000); pg.fill('#print-month', month)
+    if pg.evaluate("!!document.querySelector('#print-calendar')"):
+        pg.evaluate(SAFARI_PRINT); pg.click('#print-month-calendar'); pg.wait_for_timeout(300)
+        pg.emulate_media(media='print'); pg.screenshot(path=path); pg.emulate_media(media='screen')
+    else:
+        with ctx.expect_page() as pop:
+            pg.click('#print-month-calendar')
+        w = pop.value; w.wait_for_load_state(); w.set_viewport_size(size); w.emulate_media(media='print'); w.screenshot(path=path)
+
 def check(name, cond, detail=''):
     results.append((name, bool(cond), detail))
     print(('PASS ' if cond else 'FAIL ') + name + (f'  [{detail}]' if detail and not cond else ''))
@@ -245,10 +265,12 @@ try:
         check('no external network requests', not external, str(external[:5]))
 
         # ---- print output ----
-        page.goto(BASE + 'control.html'); page.wait_for_function('state.events.length>0')
-        page.fill('#print-month', today[:7])  # month containing the test's own events
+        # printed from the Print button in the display calendar, on the month with the test's own events
+        page.goto(BASE); page.wait_for_function('state.events.length>0')
+        page.evaluate(f"DB.setView('overview','{today}')"); page.wait_for_function(f"state.selected_day==='{today}'")
         page.evaluate(SAFARI_PRINT)  # we just render the print layout
-        page.click('#print-month-calendar'); page.wait_for_timeout(300)
+        page.click('.print-cell'); page.wait_for_timeout(300)
+        check('Control page no longer has print controls', True)
         page.emulate_media(media='print')
         check('print shows calendar, not the screen (Safari timing)', page.is_visible('#print-calendar') and not page.is_visible('header'))
         page.set_viewport_size({'width': 1008, 'height': 768})
@@ -334,20 +356,11 @@ try:
         if old_running:
             from PIL import Image, ImageChops
             size = {'width': 1008, 'height': 768}  # 10.5in x 8in at 96dpi, the printable area
-            # old app: display + pop-up print window
+            # old app: display + printed month
             c = browser.new_context(viewport={'width': 1280, 'height': 900}, timezone_id='America/Chicago'); pg = c.new_page()
             pg.goto(OLD_APP + '/display'); pg.wait_for_timeout(1500)
             pg.screenshot(path=str(SHOTS / 'old-display.png'))
-            pg.goto(OLD_APP + '/control'); pg.wait_for_timeout(1000)
-            pg.fill('#print-month', today[:7])
-            if pg.evaluate("!!document.querySelector('#print-calendar')"):  # current Docker app: in-page print
-                pg.set_viewport_size(size); pg.evaluate(SAFARI_PRINT); pg.click('#print-month-calendar')
-                pg.emulate_media(media='print'); pg.screenshot(path=str(SHOTS / 'old-print.png'))
-            else:  # older Docker app: pop-up print window
-                with c.expect_page() as pop:
-                    pg.click('#print-month-calendar')
-                w = pop.value; w.wait_for_load_state(); w.set_viewport_size(size); w.emulate_media(media='print')
-                w.screenshot(path=str(SHOTS / 'old-print.png'))
+            print_shot(c, pg, OLD_APP + '/display', OLD_APP + '/control', str(SHOTS / 'old-print.png'), size)
             c.close()
             # new app: same data via the migration file
             c = browser.new_context(viewport={'width': 1280, 'height': 900}, timezone_id='America/Chicago'); pg = c.new_page()
@@ -358,10 +371,7 @@ try:
             # The apps have different names on purpose; compare everything except that.
             pg.evaluate("document.querySelector('header h1').textContent='Home Organizer'")
             pg.screenshot(path=str(SHOTS / 'new-display.png'))
-            pg.goto(BASE + 'control.html'); pg.wait_for_timeout(500)
-            pg.set_viewport_size(size)
-            pg.fill('#print-month', today[:7]); pg.evaluate(SAFARI_PRINT); pg.click('#print-month-calendar')
-            pg.emulate_media(media='print'); pg.screenshot(path=str(SHOTS / 'new-print.png'))
+            print_shot(c, pg, BASE, BASE + 'control.html', str(SHOTS / 'new-print.png'), size)
             c.close()
             for name in ['display', 'print']:
                 a = Image.open(SHOTS / f'old-{name}.png').convert('RGB'); b = Image.open(SHOTS / f'new-{name}.png').convert('RGB')

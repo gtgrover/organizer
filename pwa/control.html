@@ -5,7 +5,6 @@
 	<meta name="viewport" content="width=device-width,initial-scale=1">
 	<title>Personal Organizer Controller</title>
 	<link rel="stylesheet" href="common.css">
-	<link rel="stylesheet" href="print.css">
 	<link rel="manifest" href="manifest.webmanifest">
 	<meta name="theme-color" content="#101724">
 	<meta name="apple-mobile-web-app-capable" content="yes">
@@ -28,9 +27,6 @@
 			<button data-view="tasks">Tasks</button>
 			<button data-view="notes">Notes</button>
 		</div>
-		<label for="print-month">Month to print</label>
-		<input id="print-month" type="month">
-		<button id="print-month-calendar" type="button" style="margin-top:8px">Print selected month</button>
 	</section>
 	<section class="panel" style="margin-top:14px">
 		<h2 id="event-form-heading">New calendar event</h2>
@@ -86,7 +82,6 @@
 		<button id="import-data" type="button" style="margin-top:8px;width:100%">Import</button>
 		<p id="backup-status" class="status" role="status"></p>
 	</section>
-	<div id="print-calendar" aria-hidden="true"></div>
 	<script src="db.js"></script>
 	<script src="common.js"></script>
 	<script src="backup.js"></script>
@@ -95,7 +90,6 @@
 		let editingEventId = null;
 		// The day selected on the display (chosen there with its calendar).
 		const selectedDay = () => state.selected_day || localDay();
-		$('#print-month').value = localDay().slice(0, 7);
 		$('#event-day').value = localDay();
 		// The new-event date follows the day selected on the display, until someone
 		// picks a date in the event form themselves.
@@ -132,11 +126,6 @@
 			$('#event-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
 		}
 
-		// Prints the month chosen in "Month to print" (printMonth is in common.js).
-		function printSelectedMonth() {
-			const [year, month] = ($('#print-month').value || localDay().slice(0, 7)).split('-').map(Number);
-			printMonth(year, month);
-		}
 
 		function render() {
 			followSelectedDay();
@@ -208,7 +197,6 @@
 		document.querySelectorAll('[data-view]').forEach(button => {
 			button.onclick = () => DB.setView(button.dataset.view).catch(showError);
 		});
-		$('#print-month-calendar').onclick = printSelectedMonth;
 		$('#cancel-event-edit').onclick = resetEventForm;
 		$('#event-form').onsubmit = async event => {
 			event.preventDefault();
